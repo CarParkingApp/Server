@@ -166,6 +166,52 @@ namespace MyREST
            
         }
 
+        public async Task<bool> Login(User user)
+        {
+            using (var con = new SqlConnection(GC.ConnectionString))
+            {
+
+                con.Open();
+
+                Query = "select count(*) as result from Users u inner join user_account ua on u.ID=ua.user_id inner join employee e on u.id=e.user_id inner join  park_employee pe on pe.employee_id=e.id where ua.mail='" + user.Email + "' and ua.pswd='" + user.Password + "'";
+
+                using (var command = new SqlCommand(Query, con))
+                {
+                    Reader = command.ExecuteReader();
+
+                    int count = 0;
+
+                    while (Reader.Read())
+                    {
+
+                        if (Reader["result"] != DBNull.Value)
+                        {
+                            count = Convert.ToInt32(Reader["result"].ToString());
+                        }
+                        else
+                        {
+                            count = 0;
+
+                        }
+                    }
+
+                    if (count > 0)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                    Com.Dispose();
+
+                }
+
+                con.Close();
+            }
+
+        }
+
         public async Task<bool> Login(User user,int Type,int ParkID)
         {
             using (var con = new SqlConnection(GC.ConnectionString))
