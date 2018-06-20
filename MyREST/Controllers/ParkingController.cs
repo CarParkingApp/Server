@@ -14,12 +14,7 @@ namespace MyREST.Controllers
         UserRepository UserRepo;
         ParkRepository ParkRepo;
 
-        List<Employees> Emps = new List<Employees>()
-        {
-            new Employees {EmpId=1,Name="Katabalwa Steven",Age=23 },
-            new Employees {EmpId=2,Name="Kasawuli Allan",Age=27 }
-        };
-
+      
         [HttpGet]
         public List<ParkingYard.Activities> GetActivities([FromUri] int ID)
         {
@@ -53,11 +48,7 @@ namespace MyREST.Controllers
             return UserRepo.GetUser(id);
         }
 
-        [HttpGet]
-        public IEnumerable<Employees> Employees()
-        {
-            return Emps;
-        }
+     
 
         [HttpGet]
         public bool CheckCar([FromUri] string License)
@@ -67,7 +58,7 @@ namespace MyREST.Controllers
         }
 
         [HttpGet]
-        public User Users([FromUri] string nin)
+        public Task<User> Users([FromUri] string nin)
         {
             UserRepo = new UserRepository();
            return UserRepo.GetUser(nin);
@@ -81,10 +72,17 @@ namespace MyREST.Controllers
         }
 
         [HttpGet]
-        public bool ExitParking([FromUri]int UserID,[FromUri] int ParkID, [FromUri] int CarID)
+        public Response ExitParking([FromUri]int UserID,[FromUri] int ParkID, [FromUri] int CarID)
         {
             ParkRepo = new ParkRepository();
-            return ParkRepo.ExitParking(UserID, CarID, ParkID);
+
+            Response rsp = new Response();
+
+            ParkRepo.ExitParking(UserID, CarID, ParkID,out rsp);
+
+            
+
+            return rsp;
         }
 
         [HttpGet]
@@ -101,23 +99,23 @@ namespace MyREST.Controllers
             return ParkRepo.GetCarID(License);
         }
 
-        [HttpGet]
-        public Employees Employee(int id)
-        {
+        //[HttpGet]
+        //public Employees Employee(int id)
+        //{
 
-            Employees Emp = new Employees();
+        //    Employees Emp = new Employees();
 
-            foreach(Employees Employee in Emps)
-            {
-                if (Employee.EmpId == id)
-                {
-                    Emp = Employee;
-                }
+        //    foreach(Employees Employee in Emps)
+        //    {
+        //        if (Employee.EmpId == id)
+        //        {
+        //            Emp = Employee;
+        //        }
 
-            }
+        //    }
 
-            return Emp;
-        }
+        //    return Emp;
+        //}
 
         [HttpGet]
         public async Task<JObject> Parks([FromUri]double lat,[FromUri] double lng)
@@ -208,31 +206,75 @@ namespace MyREST.Controllers
         }
         
         [HttpPost]
-        public async Task<string> Users([FromBody]User user)
-        {      
+        public async Task<Response> Users([FromBody]User user)
+        {
+            Response Resp = new MyREST.Response();
             UserRepo = new UserRepository();
 
             var response = await UserRepo.CreateUser(user);
 
             if (response == UserResponse.SUCCESS)
             {
-                Response = "User has been successfully created.";
+                Resp.Code = 1;
+                Resp.Message = "User has been successfully created.";
+                Resp.Data = await UserRepo.GetUser(user.NationalRegInfo.NIN);
             }
 
             else if(response == UserResponse.USEREXISTS)
             {
-                Response = "Sorry, User Already Exists";
+                Resp.Code = 0;
+                Resp.Message = "Sorry, User Already Exists";
             }
 
             else
             {
-                Response = "Not Registered";
+                Resp.Code = 0;
+                Resp.Message = "Ooops ! , Citizen is not registered";
             }
 
-            return Response;
+            return Resp;
 
         }
         
+        [HttpGet]
+        public List<Employees> Employees([FromUri]int ID)
+        {
+            ParkRepo = new ParkRepository();
+
+            return ParkRepo.GetEmployees(ID);
+        }
+
+        [HttpGet]
+        public ParkTicket GetTicket(int ID)
+        {
+            ParkRepo = new ParkRepository();
+            return ParkRepo.GetTicket(ID);
+        }
+
+      
+        [HttpGet]
+        public List<History> GetParkingHistory([FromUri] int ParkID)
+        {
+            ParkRepo = new ParkRepository();
+
+            return ParkRepo.GetParkHistory(ParkID);
+        }
+
+
+
+        [HttpGet]
+        public async Task<string> CreateEmployee([FromUri]string NIN,[FromUri]int type,[FromUri] int ParkID)
+        {
+            ParkRepo = new ParkRepository();
+
+            UserRepo = new UserRepository();
+            
+
+            ParkRepo.CreateEmployee((await UserRepo.GetUser(NIN)).ID, type, ParkID);
+
+            return "Employee Created Successfully";
+        }
+
         [HttpGet]
         public ParkingYard [] Parks()
         {

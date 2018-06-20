@@ -244,6 +244,7 @@
     <Compile Include="maps.cs" />
     <Compile Include="Models\Citizen.cs" />
     <Compile Include="Models\Employees.cs" />
+    <Compile Include="Models\History.cs" />
     <Compile Include="Models\ParkingYard.cs" />
     <Compile Include="Models\ParkTicket.cs" />
     <Compile Include="Models\User.cs" />
@@ -251,6 +252,7 @@
     <Compile Include="ParkRepository.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Response.cs" />
+    <Compile Include="SMS.cs" />
     <Compile Include="UserRepository.cs" />
   </ItemGroup>
   <ItemGroup>

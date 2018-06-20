@@ -77,6 +77,7 @@ namespace MyREST
 
             return res;
         }
+
         
         private List<User> GetFingerPrints()
         {
@@ -138,60 +139,182 @@ namespace MyREST
             }
         }
 
-        private bool AuthenticateDriver(int UserID,int CarID,int ParkID,out int CarDriverID)
+        public List<History> GetParkHistory(int ParkID)
         {
-            using(var con=new SqlConnection(GC.ConnectionString))
+            
+            List<History> hlist = new List<History>();
+
+            using (var con = new SqlConnection(GC.ConnectionString))
             {
                 con.Open();
 
-                Query = "select dbo.AuthenticateDriver(@UserID,@CarID,@ParkID)";
+                Query = "select * from dbo.CarParkActivityHistory where Park_Id='"+ParkID+"'";
 
-                using(var com=new SqlCommand(Query, con))
+                using (var com = new SqlCommand(Query, con))
                 {
+                    Reader = com.ExecuteReader();
 
-                    com.Parameters.Add(new SqlParameter("@UserID",UserID));
-                    com.Parameters.Add(new SqlParameter("@CarID",CarID));
-                    com.Parameters.Add(new SqlParameter("@ParkID",ParkID));
-
-                    var res = com.ExecuteScalar();
-                   
-
-                    if (res.ToString() != "")
+                    while (Reader.Read())
                     {
-                        int y = 0;
+                        History h = new History();
                         
-                        CarDriverID = Convert.ToInt32(res.ToString());
+                        h.TicketID = Convert.ToInt32(Reader["Ticket"].ToString());
+
+                        h.From = Convert.ToDateTime(Reader["Entered"].ToString());
+
+                        h.To= Convert.ToDateTime(Reader["Exited"].ToString());
+
+                        hlist.Add(h);
+
                     }
-                    else
+
+                    com.Dispose();
+                    
+                }
+
+                con.Close();
+            }
+
+            return hlist;
+        }
+
+
+        
+        public ParkTicket GetTicket(int ID)
+        {
+
+            ParkTicket pt = new ParkTicket();
+
+            using (var con = new SqlConnection(GC.ConnectionString))
+            {
+                if (con.State == ConnectionState.Closed)
+                {
+                    con.Open();
+                }
+                
+                Query = "select * from ParkTicketView where id='"+ID+"'";
+
+                using (var com = new SqlCommand(Query, con))
+                {
+                    Reader = com.ExecuteReader();
+
+                    while (Reader.Read())
                     {
-                        CarDriverID = 0;
+                        pt.TicketID = Convert.ToInt32(Reader["id"].ToString());
+                        pt.DriverName = Reader["FirstName"].ToString() + " " + Reader["LastName"].ToString();
+                        pt.License = Reader["license"].ToString();
+                        pt.ParkName = Reader["ParkName"].ToString();
+                        pt.Date = Convert.ToDateTime(Reader["Date"].ToString());
+
+
                     }
 
                     com.Dispose();
                 }
 
                 con.Close();
-
-                
             }
 
-            if (CarDriverID > 0)
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-
+            return pt;
         }
-        public bool ExitParking(int DriverID, int CarID, int ParkID)
+
+        private bool AuthenticateDriver(int UserID, int CarID, int ParkID, out int CarDriverID, out int ResultingDriver, out string Error)
+        {
+            int response = 0;
+
+            int DriverID = 0;
+
+            int CarDriver = 0;
+
+            bool result = false;
+
+            SMS sms = new SMS();
+
+
+            using (var con = new SqlConnection(GC.ConnectionString))
+            {
+                con.Open();
+
+                Query = "AuthenticateDriverProc";
+
+                using (var com = new SqlCommand(Query, con))
+                {
+
+                    com.CommandType = CommandType.StoredProcedure;
+
+                    com.Parameters.Add(new SqlParameter("@UserID", UserID));
+                    com.Parameters.Add(new SqlParameter("@CarID", CarID));
+                    com.Parameters.Add(new SqlParameter("@ParkID", ParkID));
+                    com.Parameters.Add(new SqlParameter("@response", SqlDbType.Int, 20, ParameterDirection.Output, false, 0, 10, null, DataRowVersion.Default, null));
+                    com.Parameters.Add(new SqlParameter("@DriverID", SqlDbType.Int, 20, ParameterDirection.Output, false, 0, 10, null, DataRowVersion.Default, null));
+                    com.Parameters.Add(new SqlParameter("@CarDriverID", SqlDbType.Int,20,ParameterDirection.Output,false,0,10,null,DataRowVersion.Default,null));
+
+
+                    com.UpdatedRowSource = UpdateRowSource.OutputParameters;
+
+                    com.ExecuteNonQuery();
+
+                    response = Convert.ToInt32(com.Parameters["@response"].Value);
+                    DriverID = Convert.ToInt32(com.Parameters["@DriverID"].Value);
+                    CarDriverID = Convert.ToInt32(com.Parameters["@CarDriverID"].Value);
+                    
+                    ResultingDriver = DriverID;
+
+                    com.Dispose();
+                }
+
+                con.Close();
+
+                if (response != 0)
+                {
+
+                    if (CarDriverID > 0)
+                    {
+                        result = true;
+                        Error = "Success";
+                    }
+                    else
+                    {
+                        result= false;
+                        Error = "Sorry, Failed to Match Car Driver";
+                    }
+
+                }
+                else
+                {
+                    result= false;
+                    Error = "Sorry, Car has been Suspended from exit. Please Contact Manager";
+
+                    sms.OpenPort("COM8", "9600");
+                   // sms.sendMsg()
+
+                }
+
+
+
+
+            }
+
+            return result;
+        }
+
+        public bool ExitParking(int DriverID, int CarID, int ParkID,out Response ErrorResponse)
         {
             int CarDriverID = 0;
+            int DriverID2 = 0;
+            string Error = null;
 
-            if(AuthenticateDriver(DriverID,CarID,ParkID,out CarDriverID))
+            Response rsp = new Response();
+
+            if (AuthenticateDriver(DriverID,CarID,ParkID,out CarDriverID,out DriverID2,out Error))
             {
-                using(var con=new SqlConnection(GC.ConnectionString))
+               
+                rsp.Message = Error;
+                rsp.Data = DriverID2.ToString();
+
+                ErrorResponse = rsp;
+
+                using (var con=new SqlConnection(GC.ConnectionString))
                 {
                     con.Open();
 
@@ -209,10 +332,18 @@ namespace MyREST
                     }
                     con.Close();
                 }
+
+               
+
                 return true;
             }
             else
             {
+                rsp.Message = Error;
+                rsp.Data = DriverID2.ToString();
+
+                ErrorResponse = rsp;
+
                 return false;
             }
         }
@@ -531,6 +662,34 @@ namespace MyREST
             
         }
 
+       
+        public void CreateEmployee(int UserID,int Type,int ParkID)
+        {
+            using(var con=new SqlConnection(GC.ConnectionString))
+            {
+                con.Open();
+
+                Query = "CreateEmployee";
+
+                using(var Com=new SqlCommand(Query, con))
+                {
+                    Com.CommandType = CommandType.StoredProcedure;
+
+                    Com.Parameters.Add(new SqlParameter("@UserID",UserID));
+                    Com.Parameters.Add(new SqlParameter("@EmployeeType",Type));
+                    Com.Parameters.Add(new SqlParameter("@ParkID",ParkID));
+
+                    Com.ExecuteNonQuery();
+
+                    Com.Dispose();
+                }
+
+                con.Close();
+
+            }
+        }
+       
+
         public void GenerateSpaceData()
         {
 
@@ -550,6 +709,42 @@ namespace MyREST
             }
 
          }
+
+        public List<Employees> GetEmployees(int ParkID)
+        {
+            List<Employees> emplist = new List<Employees>();
+
+            using (Con = new SqlConnection(GC.ConnectionString))
+            {
+                Con.Open();
+
+                Query = "select * from dbo.Employee_View where Park_id='" + ParkID + "'";
+
+                using (var com = new SqlCommand(Query, Con))
+                {
+                    Reader = com.ExecuteReader();
+
+                    while (Reader.Read())
+                    {
+                        Employees emp = new Employees();
+                        emp.EmpId = Convert.ToInt32(Reader["id"].ToString());
+                        emp.Name = Reader["Name"].ToString();
+                        emp.Position = Reader["Position"].ToString();
+                        emp.Gender = Reader["Sex"].ToString();
+
+                        emplist.Add(emp);
+                    }
+
+                    com.Dispose();
+
+                }
+
+                Con.Close();
+
+            }
+                return emplist;
+
+            }
 
         public ParkingYard GetParkingYard(string Place_ID)
         {

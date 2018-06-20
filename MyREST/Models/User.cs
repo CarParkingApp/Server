@@ -16,6 +16,11 @@ namespace MyREST.Models
         public Citizen NationalRegInfo { get; set; }
         public List<UserActivity> UserActivity { get; set; }
         public string FingerPrint { get; set; }
+
+        public static implicit operator string(User v)
+        {
+            throw new NotImplementedException();
+        }
     }
 
 

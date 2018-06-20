@@ -54,6 +54,7 @@ namespace MyREST
         public async Task<UserResponse> CreateUser(User user)
         {
             bool UserCreated = false;
+
             NIRA nira = new NIRA();
 
             if (user.NationalRegInfo.NIN != null)
@@ -112,8 +113,7 @@ namespace MyREST
             }
             else
             {
-
-
+                
                 if (nira.CheckPerson(new ImageConverter().ToBitmap(new ImageConverter().ToByteArr(user.NationalRegInfo.FingerPrint))))
                 {
 
@@ -166,100 +166,87 @@ namespace MyREST
            
         }
 
-        public async Task<bool> Login(User user)
+        public async Task<User> Login(string Email,string Password)
         {
+            int Response = 0;
+            User user = new User();
+
             using (var con = new SqlConnection(GC.ConnectionString))
             {
 
                 con.Open();
 
-                Query = "select count(*) as result from Users u inner join user_account ua on u.ID=ua.user_id inner join employee e on u.id=e.user_id inner join  park_employee pe on pe.employee_id=e.id where ua.mail='" + user.Email + "' and ua.pswd='" + user.Password + "'";
+                Query = "select dbo.AuthenticateUser(@Email,@Password)";
 
                 using (var command = new SqlCommand(Query, con))
                 {
-                    Reader = command.ExecuteReader();
 
-                    int count = 0;
+                    command.Parameters.Add(new SqlParameter("@Email", Email));
+                    command.Parameters.Add(new SqlParameter("@Password", Password));
 
-                    while (Reader.Read())
-                    {
-
-                        if (Reader["result"] != DBNull.Value)
-                        {
-                            count = Convert.ToInt32(Reader["result"].ToString());
-                        }
-                        else
-                        {
-                            count = 0;
-
-                        }
-                    }
-
-                    if (count > 0)
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        return false;
-                    }
-                    Com.Dispose();
+                    Response =(int) command.ExecuteScalar();
+                    
+                    command.Dispose();
 
                 }
 
                 con.Close();
             }
 
+            if (Response != 0)
+            {
+                user = GetUser(Response);
+            }
+            else
+            {
+                user = null;
+            }
+
+            return user;
         }
 
-        public async Task<bool> Login(User user,int Type,int ParkID)
+        public async Task<int> Login(User user,int Type,int ParkID)
         {
+            int ID = 0;
+
             using (var con = new SqlConnection(GC.ConnectionString))
             {
 
                 con.Open();
           
-                Query = "select count(*) as result from Users u inner join user_account ua on u.ID=ua.user_id inner join employee e on u.id=e.user_id inner join  park_employee pe on pe.employee_id=e.id where ua.mail='" + user.Email + "' and ua.pswd='" + user.Password + "' and pe.park_id='"+ParkID+"' and e.Employee_Type='"+Type+"'";
+                Query = "select top 1 u.id from Users u inner join user_account ua on u.ID=ua.user_id inner join employee e on u.id=e.user_id inner join  park_employee pe on pe.employee_id=e.id where ua.mail='" + user.Email + "' and ua.pswd='" + user.Password + "' and pe.park_id='"+ParkID+"' and e.Employee_Type='"+Type+"'";
 
                 using (var command = new SqlCommand(Query, con))
                 {
                     Reader = command.ExecuteReader();
-
-                    int count = 0;
-
+                    
                     while (Reader.Read())
                     {
 
-                        if (Reader["result"] != DBNull.Value)
+                        if (Reader["id"] != DBNull.Value)
                         {
-                            count = Convert.ToInt32(Reader["result"].ToString());
+                            ID = Convert.ToInt32(Reader["id"].ToString());
                         }
                         else
                         {
-                            count = 0;
+                            ID = 0;
                             
                         }
                     }
 
-                    if (count > 0)
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        return false;
-                    }
-                    Com.Dispose();
+                    command.Dispose();
 
                 }
 
                 con.Close();
             }
 
+            return ID;
+
         }
 
       
-        public User GetUser(string NIN)
+        public async Task<User> GetUser(string NIN)
         {
             User user = new User();
 
@@ -286,6 +273,7 @@ namespace MyREST
                         user.NationalRegInfo.LastName = Reader["LastName"].ToString();
                         user.NationalRegInfo.MiddleName = Reader["MiddleName"].ToString();
                         user.Email = Reader["mail"].ToString();
+                        user.UserName = Reader["UserName"].ToString();
 
                         if (Reader["fingerprint"] != DBNull.Value)
                         {
@@ -304,7 +292,45 @@ namespace MyREST
             }
             return user;
           }
-    
+
+        public User GetUser(int ID)
+        {
+            User user = new User();
+
+            Query = "Select * from Users u left join User_Account ua on u.id=ua.user_id where u.id='" + ID + "'";
+
+            using (Con = new SqlConnection(GC.ConnectionString))
+            {
+                if (Con.State == ConnectionState.Closed)
+                {
+                    Con.Open();
+                }
+
+                using (Com = new SqlCommand(Query, Con))
+                {
+                    Reader = Com.ExecuteReader();
+
+                    while (Reader.Read())
+                    {
+                        user.NationalRegInfo = new Citizen();
+
+                        user.ID = Convert.ToInt32(Reader["id"].ToString());
+                        user.NationalRegInfo.FirstName = Reader["FirstName"].ToString();
+                        user.NationalRegInfo.LastName = Reader["LastName"].ToString();
+                        user.NationalRegInfo.MiddleName = Reader["MiddleName"].ToString();
+                        user.Email = Reader["mail"].ToString();
+                        user.UserName = Reader["UserName"].ToString();
+                        user.PhoneNumber = Reader["PhoneNumber"].ToString();
+
+                    }
+
+                    Com.Dispose();
+                }
+
+            }
+            return user;
+        }
+
         private async Task<bool> CitizenExists(string NIN)
         {
             using (var Con = new SqlConnection(GC.NIRAConnectionString))
@@ -375,43 +401,7 @@ namespace MyREST
             }
         }
 
-        public User GetUser(int ID)
-        {
-            User user = new User();
-
-            Query = "Select * from Users u left join User_Account ua on u.id=ua.user_id where u.id='"+ID+"'";
-
-            using (Con = new SqlConnection(GC.ConnectionString))
-            {
-                if (Con.State == ConnectionState.Closed)
-                {
-                    Con.Open();
-                }
-
-                using (Com = new SqlCommand(Query, Con))
-                {
-                    Reader = Com.ExecuteReader();
-
-                    while (Reader.Read())
-                    {
-                        user.NationalRegInfo = new Citizen();
-
-                        user.ID = Convert.ToInt32(Reader["id"].ToString());
-                        user.NationalRegInfo.FirstName = Reader["FirstName"].ToString();
-                        user.NationalRegInfo.LastName = Reader["LastName"].ToString();
-                        user.NationalRegInfo.MiddleName = Reader["MiddleName"].ToString();
-                        user.Email = Reader["mail"].ToString();
-                        //user.UserName = Reader["UserName"].ToString();
-                        user.PhoneNumber = Reader["PhoneNumber"].ToString();
-                        
-                    }
-
-                    Com.Dispose();
-                }
-
-            }
-            return user;
-        }
+       
 
        
     }
