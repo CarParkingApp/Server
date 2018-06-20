@@ -9,6 +9,36 @@ namespace MyREST
     public class GlobalConfigurations
     {
         private string conn;
+        private string PortName;
+        private string Title;
+
+        public string SystemTitle
+        {
+            get
+            {
+                Title = ConfigurationManager.AppSettings["SystemTitle"];
+                return Title;
+            }
+            set
+            {
+                Title = value;
+            }
+
+        }
+
+        public string SerialPortName
+        {
+            get
+            {
+                PortName = ConfigurationManager.AppSettings["PortName"];
+                return PortName;
+            }
+            set
+            {
+                PortName = value;
+            }
+        }
+
         public string ConnectionString
         {
             get

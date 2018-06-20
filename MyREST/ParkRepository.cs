@@ -139,6 +139,50 @@ namespace MyREST
             }
         }
 
+        public User GetCarDriver(int CarID,int ParkID)
+        {
+            User Driver = new User();
+
+            using(var con=new SqlConnection(GC.ConnectionString))
+            {
+                con.Open();
+
+                Query = "Select top 1 * from Users u inner join user_Account ua on u.id=ua.user_id inner join driver d on d.user_id=u.id inner join car_driver cd on cd.Driver_id=d.id inner join car_park cp on cp.car_driver_id=cd.id inner join park_ticket pt on pt.car_park_id=cp.id where cd.car_id='"+CarID+"' and cp.Park_id='"+ParkID+"' and pt.status=0 order by cp.id desc";
+
+                using(var com=new SqlCommand(Query, con))
+                {
+                    Reader = com.ExecuteReader();
+
+                    Driver.NationalRegInfo = new Citizen();
+
+                    while (Reader.Read())
+                    {
+                        
+                        Driver.ID = Convert.ToInt32(Reader["id"].ToString());
+                        Driver.NationalRegInfo.FirstName = Reader["FirstName"].ToString();
+                        Driver.NationalRegInfo.LastName = Reader["LastName"].ToString();
+                        Driver.NationalRegInfo.MiddleName = Reader["MiddleName"].ToString();
+                        Driver.Email = Reader["mail"].ToString();
+                        Driver.UserName = Reader["UserName"].ToString();
+
+                        if (Reader["fingerprint"] != DBNull.Value)
+                        {
+                            Driver.FingerPrint = Reader["fingerprint"].ToString();
+                        }
+                        Driver.NationalRegInfo.NIN = Reader["nin"].ToString();
+                        Driver.PhoneNumber = Reader["PhoneNumber"].ToString();
+
+                    }
+
+                    com.Dispose();
+                }
+
+                con.Close();
+            }
+
+            return Driver;
+        }
+
         public List<History> GetParkHistory(int ParkID)
         {
             
@@ -275,19 +319,35 @@ namespace MyREST
                     }
                     else
                     {
-                        result= false;
+                        result = false;
                         Error = "Sorry, Failed to Match Car Driver";
                     }
 
                 }
                 else
                 {
-                    result= false;
+                    User Driver = new User();
+                    Driver = GetCarDriver(CarID, ParkID);
+
+
+                    if (Driver.PhoneNumber != null)
+                    {
+                        try
+                        {
+                            
+                            sms.OpenPort(GC.SerialPortName, "9600");
+
+                            sms.sendMsg(Driver.PhoneNumber, "Hello '" + Driver.NationalRegInfo.FirstName + " " + Driver.NationalRegInfo.LastName + "'," + System.Environment.NewLine + "Looks like you or someone got it worng on taking your car out of "+GetParkingYard(ParkID).Name);
+
+                        }
+                        catch
+                        {
+
+                        }
+                    }
+
                     Error = "Sorry, Car has been Suspended from exit. Please Contact Manager";
-
-                    sms.OpenPort("COM8", "9600");
-                   // sms.sendMsg()
-
+                    
                 }
 
 

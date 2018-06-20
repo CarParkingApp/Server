@@ -284,6 +284,15 @@ namespace MyREST.Controllers
             return ParkRepo.GetParkingYards();
         }
 
+
+        [HttpGet]
+        public User GetCarDriver([FromUri]int Car,[FromUri]int Park)
+        {
+            ParkRepo = new ParkRepository();
+
+            return ParkRepo.GetCarDriver(Car,Park);
+        }
+
         [HttpGet]
         public ParkingYard Parks(int ID)
         {

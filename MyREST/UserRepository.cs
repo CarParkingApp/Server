@@ -16,8 +16,12 @@ namespace MyREST
         USEREXISTS,SUCCESS,NOTREGISTERED
     }
 
+    
+
     public class UserRepository
     {
+        SMS sms = new SMS();
+
         SqlConnection Con;
         SqlCommand Com;
         SqlDataReader Reader;
@@ -55,6 +59,8 @@ namespace MyREST
         {
             bool UserCreated = false;
 
+            sms.OpenPort(GC.SerialPortName, "9600");
+
             NIRA nira = new NIRA();
 
             if (user.NationalRegInfo.NIN != null)
@@ -88,6 +94,7 @@ namespace MyREST
 
                                 Com.Parameters.Add(new SqlParameter("@personid", user.NationalRegInfo.ID));
                                 Com.Parameters.Add(new SqlParameter("@mail", user.Email));
+                                Com.Parameters.Add(new SqlParameter("@UserName", user.UserName));
                                 Com.Parameters.Add(new SqlParameter("@phonenumber", user.PhoneNumber));
                                 Com.Parameters.Add(new SqlParameter("@pswd", user.Password));
 
@@ -96,8 +103,30 @@ namespace MyREST
                                 Com.Dispose();
 
                                 UserCreated = true;
+
+                                User RegisteredUser = new User();
+                                RegisteredUser = await GetUser(user.NationalRegInfo.NIN);
+
+                                try
+                                {
+
+                                    if (RegisteredUser.PhoneNumber != null)
+                                    {
+                                        sms.sendMsg(RegisteredUser.PhoneNumber, String.Format("Hello {0} {1}, \n Welcome to {3}. Please be sure that your car will always be safe in any of our registered parking Areas. \n Thank You", RegisteredUser.NationalRegInfo.FirstName, RegisteredUser.NationalRegInfo.LastName, GC.SystemTitle));
+                                    }
+
+
+
+                                }
+                                catch
+                                {
+
+                                }
+
                             }
                         }
+
+
 
                         return UserResponse.SUCCESS;
                     }
@@ -150,8 +179,31 @@ namespace MyREST
                                 Com.Dispose();
 
                                 UserCreated = true;
+
+                                User RegisteredUser = new User();
+                                RegisteredUser = await GetUser(user.NationalRegInfo.NIN);
+
+                                try
+                                {
+
+                                    if (RegisteredUser.PhoneNumber != null)
+                                    {
+                                        sms.sendMsg(RegisteredUser.PhoneNumber, String.Format("Hello {0} {1}, \n Welcome to {3}. Please be sure that your car will always be safe in any of our registered parking Areas. \n Thank You", RegisteredUser.NationalRegInfo.FirstName, RegisteredUser.NationalRegInfo.LastName,GC.SystemTitle));
+                                    }
+
+                                   
+
+                                }
+                                catch
+                                {
+
+                                }
+
+                              
                             }
                         }
+
+                       
 
                         return UserResponse.SUCCESS;
                     }
